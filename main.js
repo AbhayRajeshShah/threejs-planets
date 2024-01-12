@@ -9,15 +9,30 @@ import {
   Mesh,
   PointLight,
   Object3D,
+  AmbientLight,
+  Raycaster,
+  Ray,
 } from "three";
 
 import gsap from "gsap/gsap-core";
 import { CSSPlugin } from "gsap/CSSPlugin";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ScrollToPlugin } from "gsap/all";
+
+//mouse positions
+let pointer = {
+  x: 0,
+  y: 0,
+};
+
+//initialize raycaster
+
+const raycaster = new Raycaster();
 
 //register plugins
 gsap.registerPlugin(CSSPlugin);
 gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollToPlugin);
 
 //initialize renderer and create scene
 const canvas = document.querySelector(".webgl");
@@ -54,11 +69,25 @@ const material = new MeshStandardMaterial({ map: moon, normalMap: moon });
 const sphere = new Mesh(geometry, material);
 scene.add(sphere);
 
+//create sun
+const sunTexture = textureLoader.load("sun.jpg");
+const sunMaterial = new MeshStandardMaterial({ map: sunTexture });
+const sun = new Mesh(geometry, sunMaterial);
+sun.position.set(0, 0, 170);
+scene.add(sun);
+
+//lighting up the sun
+const ambientLight = new AmbientLight(0xffffff, 2);
+ambientLight.intensity = 0;
+sun.add(ambientLight);
+
 //create-earth
 const earthMaterial = new MeshStandardMaterial({
   map: earthTexture,
 });
 const earth = new Mesh(geometry, earthMaterial);
+scene.add(earth);
+earth.position.set(0, 0, -100);
 
 // point-light
 const pointLight = new PointLight(0xffffff, 100, 100);
@@ -107,11 +136,8 @@ const onReachingSecond = () => {
   console.log("second");
   if (created) {
     created = false;
-    moonParent.remove(sphere);
     scene.add(sphere);
-    scene.remove(earth);
-    earth.position.set(0, 0, 0);
-    earth.rotation.set(0, 0, 0);
+    gsap.to(earth.position, { z: -100, duration: 0.5 });
     moonParent.rotation.set(0, 0, 0);
   }
 };
@@ -199,12 +225,10 @@ sa.to(sphere.rotation, {
 //break point for third section (i.e add earth)
 const onReachingThird = () => {
   if (!created) {
-    earth.position.set(0, 0, 0);
-    scene.add(earth);
+    gsap.to(earth.position, { z: 0, duration: 0.5 });
     moonParent.add(sphere);
-    scene.remove(sphere);
+    created = true;
   }
-  created = true;
   console.log("reached third");
 };
 
@@ -259,6 +283,9 @@ sa.to(sphere.position, {
   },
 });
 
+let recentlyClicked = false;
+let done = false;
+
 //loop to constantly update canvas
 const loop = () => {
   // if earth is added simply rotate earth and moonParent
@@ -271,6 +298,61 @@ const loop = () => {
   sphere.rotation.x += 0.001;
   sphere.rotation.y += 0.001;
   window.requestAnimationFrame(loop);
+  //check for object intersection when day
+  if (recentlyClicked && day && !done) {
+    recentlyClicked = false;
+    raycaster.setFromCamera(pointer, camera);
+    let intersections = raycaster.intersectObjects(scene.children, false);
+    if (intersections.length > 0) {
+      console.log(intersections);
+      gsap.to(".cringe", { opacity: 1, duration: 1.5 });
+      window.setTimeout(() => {
+        gsap.to(".overlay", { yPercent: -100, duration: 1 });
+      }, 750);
+    }
+  }
 };
 
 loop();
+
+//boolean to check for sun
+let day = false;
+
+//work on sun
+document.querySelectorAll(".icon").forEach((icon) => {
+  icon.addEventListener("click", (e) => {
+    day = !day;
+    if (day) {
+      gsap.to(".day", { opacity: 0, duration: 2 });
+      gsap.to(".day", { display: "none", duration: 3 });
+      gsap.to(camera.position, { z: 190, duration: 1.5 });
+      gsap.to(ambientLight, { intensity: 2, duration: 3 });
+      gsap.to(".overlay", { yPercent: 0 });
+      gsap.to(".cringe", { opacity: 0 });
+      window.setTimeout(() => {
+        gsap.to(window, { duration: 1, scrollTo: { y: 0 } });
+        gsap.to(".night", { display: "grid", duration: 2 });
+        gsap.to(".night", { opacity: 1, duration: 2 });
+      }, 1500);
+    } else {
+      gsap.to(".night", { opacity: 0, duration: 2 });
+      gsap.to(".night", { display: "none", duration: 3 });
+      gsap.to(camera.position, { z: 20, duration: 3 });
+      gsap.to(ambientLight, { intensity: 0, duration: 3 });
+      window.setTimeout(() => {
+        gsap.to(window, { duration: 1, scrollTo: { y: 0 } });
+        sphere.position.set(-5, 0, 0);
+        sphere.scale.set(1, 1, 1);
+        gsap.to(".day", { display: "block", duration: 2 });
+        gsap.to(".day", { opacity: 1, duration: 2 });
+      }, 1500);
+    }
+  });
+});
+
+window.addEventListener("click", (e) => {
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  console.log(e.target);
+  recentlyClicked = true;
+});
