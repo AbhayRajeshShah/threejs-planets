@@ -11,7 +11,6 @@ import {
   Object3D,
   AmbientLight,
   Raycaster,
-  Ray,
 } from "three";
 
 import gsap from "gsap/gsap-core";
@@ -335,6 +334,7 @@ document.querySelectorAll(".icon").forEach((icon) => {
         gsap.to(".night", { opacity: 1, duration: 2 });
       }, 1500);
     } else {
+      sphere.rotation.set(0, 0, 0);
       gsap.to(".night", { opacity: 0, duration: 2 });
       gsap.to(".night", { display: "none", duration: 3 });
       gsap.to(camera.position, { z: 20, duration: 3 });
@@ -356,3 +356,8 @@ window.addEventListener("click", (e) => {
   console.log(e.target);
   recentlyClicked = true;
 });
+
+window.onbeforeunload = () => {
+  gsap.to(window, { scrollTo: { y: 0 } });
+  history.scrollRestoration = "manual";
+};
